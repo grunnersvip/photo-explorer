@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Explorer — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0e1012;
+      color: #c8cdd4;
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-wrap {
+      width: 360px;
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .login-logo .icon {
+      font-size: 36px;
+      display: block;
+      margin-bottom: 10px;
+      opacity: 0.8;
+    }
+
+    .login-logo h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      color: #e0e4ea;
+    }
+
+    .login-logo p {
+      font-size: 11px;
+      color: #555;
+      letter-spacing: 0.08em;
+      margin-top: 4px;
+    }
+
+    .login-box {
+      background: #161a1e;
+      border: 1px solid #2a2e33;
+      padding: 32px;
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .field input {
+      width: 100%;
+      background: #0e1012;
+      border: 1px solid #2a2e33;
+      color: #c8cdd4;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .field input:focus {
+      border-color: #3b8eea;
+    }
+
+    .error-msg {
+      background: rgba(224,108,108,0.08);
+      border: 1px solid rgba(224,108,108,0.3);
+      color: #e06c6c;
+      font-size: 11px;
+      padding: 9px 12px;
+      margin-bottom: 18px;
+      display: none;
+      letter-spacing: 0.04em;
+    }
+
+    .error-msg.show { display: block; }
+
+    .btn-login {
+      width: 100%;
+      padding: 11px;
+      background: #1a3a5c;
+      border: 1px solid #3b8eea;
+      color: #7bb8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      text-transform: uppercase;
+    }
+
+    .btn-login:hover {
+      background: #1f4a78;
+      color: #a8d0f8;
+    }
+
+    .btn-login:active {
+      background: #163354;
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 10px;
+      color: #333;
+      letter-spacing: 0.06em;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-wrap">
+  <div class="login-logo">
+    <span class="icon">🖼</span>
+    <h1>PHOTO EXPLORER</h1>
+    <p>Sign in to continue</p>
+  </div>
+
+  <div class="login-box">
+    <div class="error-msg" id="errorMsg">Invalid username or password</div>
+
+    <form method="POST" action="/login">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" name="username" id="username" autocomplete="username" autofocus required>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-login">Sign In</button>
+    </form>
+  </div>
+
+  <div class="login-footer">PHOTO EXPLORER &nbsp;·&nbsp; SECURE ACCESS</div>
+</div>
+
+<script>
+  // Show error if redirected back with ?error=1
+  if (window.location.search.includes('error=1')) {
+    document.getElementById('errorMsg').classList.add('show');
+    document.getElementById('password').value = '';
+    document.getElementById('username').focus();
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,17 @@
+services:
+  photo-explorer:
+    image: xluciangit/photo-explorer:latest  # Replace with your Docker Hub username
+    container_name: photo-explorer
+    user: "1000:1000"
+    ports:
+      - "3000:3000"    # Change 5055 to any port you prefer
+    volumes:
+      - /path/to/your/photos:/images  # ← REQUIRED: replace with your photo folder path
+    environment:
+      # ── Login credentials ──────────────────────────────────────────────────
+      - PE_USERNAME=admin
+      - PE_PASSWORD=changeme
+      # ── Session secret — set to a long random string to survive restarts ──
+      # Generate one with: openssl rand -hex 32
+      - PE_SESSION_SECRET=change_this_to_a_random_string
+    restart: unless-stopped

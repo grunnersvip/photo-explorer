@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo Explorer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Syne:wght@400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1c1e;
+  --surface: #202224;
+  --surface2: #26282b;
+  --surface3: #2c2f32;
+  --border: #333638;
+  --border-light: #3d4144;
+  --accent: #3b8eea;
+  --accent-dim: rgba(59,142,234,0.15);
+  --accent-hover: rgba(59,142,234,0.08);
+  --text: #d4d8dc;
+  --text-dim: #8a9099;
+  --text-muted: #555a61;
+  --selected-bg: rgba(59,142,234,0.2);
+  --selected-border: #3b8eea;
+  --toolbar-h: 44px;
+  --statusbar-h: 26px;
+  --tree-w: 280px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+
+/* ── LAYOUT ── */
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.titlebar {
+  height: 32px;
+  background: #161718;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.titlebar-icon { font-size: 14px; }
+.titlebar-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: var(--text-dim); }
+
+.toolbar {
+  height: var(--toolbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 6px;
+}
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.tb-btn:hover { background: var(--surface3); color: var(--text); }
+.tb-btn:active { background: rgba(255,255,255,0.07); }
+.tb-btn:disabled { opacity: 0.35; cursor: default; }
+.tb-btn:disabled:hover { background: transparent; }
+
+.tb-btn.primary { color: var(--accent); }
+.tb-btn.primary:hover { background: var(--accent-dim); }
+
+.tb-btn svg { flex-shrink: 0; }
+
+.tb-icon { font-size: 15px; line-height: 1; }
+
+.breadcrumb {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 10px;
+  height: 28px;
+  overflow: hidden;
+  min-width: 0;
+  margin: 0 4px;
+}
+
+.bc-part {
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 2px;
+}
+.bc-part:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.bc-sep { color: var(--text-muted); font-size: 10px; padding: 0 2px; }
+.bc-part.active { color: var(--text); }
+
+/* ── MAIN AREA ── */
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ── TREE PANEL ── */
+.tree-panel {
+  width: var(--tree-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 6px 12px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.tree-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+
+.tree-scroll::-webkit-scrollbar { width: 6px; }
+.tree-scroll::-webkit-scrollbar-track { background: transparent; }
+.tree-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.tree-node {
+  user-select: none;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px 3px 0;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.08s;
+}
+
+.tree-row:hover { background: var(--accent-hover); }
+
+.tree-row.selected {
+  background: var(--selected-bg);
+  border-color: var(--selected-border);
+  border-left: 2px solid var(--selected-border);
+}
+
+.tree-toggle {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 9px;
+  transition: transform 0.15s;
+}
+
+.tree-toggle.open { transform: rotate(90deg); }
+.tree-toggle.leaf { opacity: 0; pointer-events: none; }
+
+.tree-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.tree-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+.tree-children {
+  display: none;
+}
+
+.tree-children.open {
+  display: block;
+}
+
+/* ── CONTENT PANEL ── */
+.content-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+}
+
+/* THUMBNAIL GRID */
+.thumb-grid {
+  overflow-y: auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 160px);
+  grid-auto-rows: 185px;
+  gap: 12px;
+  align-content: start;
+  /* Must NOT be flex:1 — that constrains height and causes rows to squish */
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.thumb-grid::-webkit-scrollbar { width: 8px; }
+.thumb-grid::-webkit-scrollbar-track { background: transparent; }
+.thumb-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.thumb-card {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.thumb-card:hover {
+  border-color: var(--border-light);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+.thumb-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 4px 16px rgba(59,142,234,0.2);
+}
+
+.thumb-img-wrap {
+  width: 160px;
+  height: 160px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #111;
+  position: relative;
+}
+
+.thumb-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.2s;
+}
+
+.thumb-img-wrap img.loading { opacity: 0; }
+
+.thumb-label {
+  padding: 5px 7px;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-top: 1px solid var(--border);
+}
+
+.thumb-rotation-tag {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(59,142,234,0.9);
+  color: white;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── VIEWER MODE ── */
+.viewer-pane {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.viewer-pane.active { display: flex; }
+
+.viewer-toolbar {
+  height: var(--toolbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vt-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 6px;
+}
+
+.rotation-badge {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--accent);
+  min-width: 50px;
+  text-align: center;
+  border-radius: 2px;
+}
+
+.viewer-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  background: #111;
+}
+
+.viewer-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(255,255,255,0.015) 24px, rgba(255,255,255,0.015) 25px),
+    repeating-linear-gradient(90deg, transparent, transparent 24px, rgba(255,255,255,0.015) 24px, rgba(255,255,255,0.015) 25px);
+  pointer-events: none;
+}
+
+#mainImg {
+  max-width: 95%;
+  max-height: 95%;
+  object-fit: contain;
+  display: block;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+  transition: opacity 0.2s;
+}
+
+#mainImg.loading { opacity: 0; }
+
+.img-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 60px;
+  background: rgba(26,28,30,0.8);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+  backdrop-filter: blur(4px);
+}
+
+.img-nav-btn:hover { background: rgba(40,42,45,0.95); color: var(--text); }
+.img-nav-btn.prev { left: 0; border-left: none; border-radius: 0 3px 3px 0; }
+.img-nav-btn.next { right: 0; border-right: none; border-radius: 3px 0 0 3px; }
+
+.viewer-filmstrip {
+  height: 90px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.viewer-filmstrip::-webkit-scrollbar { height: 4px; }
+.viewer-filmstrip::-webkit-scrollbar-track { background: transparent; }
+.viewer-filmstrip::-webkit-scrollbar-thumb { background: var(--border); }
+
+.film-thumb {
+  flex-shrink: 0;
+  width: 68px;
+  height: 68px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.1s;
+}
+
+.film-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.film-thumb.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+/* ── STATUS BAR ── */
+.statusbar {
+  height: var(--statusbar-h);
+  background: #161718;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.status-item {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-item span { color: var(--text-dim); }
+
+/* ── EMPTY / LOADING STATES ── */
+.folder-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.folder-empty .big-icon { font-size: 48px; opacity: 0.3; }
+.folder-empty p { font-size: 12px; letter-spacing: 0.05em; }
+
+.welcome-pane {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.welcome-pane .big-icon { font-size: 56px; opacity: 0.2; }
+.welcome-pane h2 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 400; color: var(--text-dim); }
+.welcome-pane p { font-size: 11px; letter-spacing: 0.08em; }
+
+/* ── RESIZER ── */
+.resizer {
+  width: 4px;
+  background: var(--border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+
+.resizer:hover, .resizer.dragging { background: var(--accent); }
+
+/* ── CONTEXT MENU ── */
+.ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--surface2);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  display: none;
+}
+
+.ctx-menu.open { display: block; }
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text);
+  transition: background 0.08s;
+}
+
+.ctx-item:hover { background: var(--accent-dim); color: var(--accent); }
+.ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* ── LOADING SPINNER ── */
+.spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+}
+
+/* ── ERROR TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #3a1a1a;
+  border: 1px solid #7a2a2a;
+  color: #f08080;
+  font-size: 12px;
+  padding: 10px 20px;
+  border-radius: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 9999;
+  max-width: 420px;
+  text-align: center;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── MULTI-SELECT ── */
+.thumb-card.selected .thumb-img-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(59,142,234,0.18);
+  pointer-events: none;
+}
+
+.thumb-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.7);
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.thumb-card:hover .thumb-check,
+.thumb-card.selected .thumb-check {
+  opacity: 1;
+}
+
+.thumb-card.selected .thumb-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Progress overlay for batch rotate */
+.batch-progress {
+  position: fixed;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  padding: 10px 20px;
+  font-size: 12px;
+  color: var(--text);
+  z-index: 9998;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  border-radius: 3px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  min-width: 260px;
+}
+
+.batch-progress.visible { display: flex; }
+
+.batch-bar-wrap {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.batch-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.2s;
+  width: 0%;
+}
+
+.tb-btn.select-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── CONFIRM DIALOG ── */
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,0.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.confirm-dialog.open {
+  display: flex !important;
+}
+.confirm-box {
+  background: #1e2024;
+  border: 1px solid #444;
+  padding: 28px 32px;
+  min-width: 340px;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+.confirm-box h3 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0 0 10px 0;
+  color: #e0e0e0;
+}
+.confirm-box p {
+  font-size: 12px;
+  color: #888;
+  margin: 0 0 24px 0;
+  line-height: 1.6;
+}
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.confirm-cancel {
+  padding: 8px 20px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #aaa;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.confirm-cancel:hover { border-color: #666; color: #eee; }
+.confirm-delete {
+  padding: 8px 20px;
+  border: 1px solid #7a2a2a;
+  background: rgba(224,108,108,0.12);
+  color: #e06c6c;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.confirm-delete:hover { background: rgba(224,108,108,0.25); border-color: #e06c6c; }
+/* Delete toolbar button */
+#btnDelete { color: #e06c6c; }
+#btnDelete:hover { background: rgba(224,108,108,0.12); border-color: #e06c6c; }
+
+/* ── THUMB SIZE SLIDER ── */
+.thumb-size-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px;
+}
+.thumb-size-control .sz-icon {
+  font-size: 10px;
+  color: var(--text-muted);
+  user-select: none;
+  line-height: 1;
+}
+.thumb-size-control .sz-icon.big { font-size: 14px; }
+.thumb-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 90px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.thumb-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.thumb-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.thumb-slider::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+}
+.sz-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 28px;
+  text-align: right;
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Title Bar -->
+  <div class="titlebar">
+    <span class="titlebar-icon">🖼</span>
+    <span class="titlebar-title">PHOTO EXPLORER</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+      <span id="loggedInAs" style="font-size:10px;color:#555;letter-spacing:0.06em;"></span>
+      <form method="POST" action="/logout" style="margin:0;">
+        <button type="submit" style="background:transparent;border:1px solid #2a2e33;color:#666;font-family:JetBrains Mono,monospace;font-size:10px;padding:4px 12px;cursor:pointer;letter-spacing:0.08em;transition:all 0.15s;" onmouseover="this.style.borderColor='#555';this.style.color='#aaa'" onmouseout="this.style.borderColor='#2a2e33';this.style.color='#666'">LOGOUT</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Toolbar -->
+  <div class="toolbar">
+    <button class="tb-btn" id="btnBack" onclick="goBack()" disabled title="Back">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <button class="tb-btn" id="btnUp" onclick="goUp()" disabled title="Up">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+
+    <div class="breadcrumb" id="breadcrumb">
+      <span class="bc-part active" onclick="selectFolder('')">📁 Images</span>
+    </div>
+
+    <div class="toolbar-sep"></div>
+
+    <!-- Rotation controls (shown when image selected) -->
+    <button class="tb-btn primary" id="btnRotateCCW" onclick="rotateSelected('ccw')" disabled title="Rotate Left 90°">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Rotate Left
+    </button>
+    <button class="tb-btn primary" id="btnRotateCW" onclick="rotateSelected('cw')" disabled title="Rotate Right 90°">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+      Rotate Right
+    </button>
+    <div class="rotation-badge" id="rotationBadge" style="display:none;">0°</div>
+
+    <div class="toolbar-sep"></div>
+
+    <button class="tb-btn" id="btnSelectAll" onclick="selectAll()" title="Select All (Ctrl+A)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="9 11 12 14 22 4"/></svg>
+      Select All
+    </button>
+    <button class="tb-btn" id="btnClearSel" onclick="clearSelection()" style="display:none;" title="Clear Selection (Escape)">
+      ✕ Clear
+    </button>
+    <button class="tb-btn" id="btnDelete" onclick="deleteSelected()" style="display:none;" title="Delete selected (Del)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      Delete
+    </button>
+
+    <div class="toolbar-sep"></div>
+
+    <div class="thumb-size-control" title="Thumbnail size">
+      <span class="sz-icon">▪</span>
+      <input type="range" class="thumb-slider" id="thumbSizeSlider"
+             min="80" max="300" step="10" value="160"
+             oninput="setThumbSize(this.value)">
+      <span class="sz-icon big">▪</span>
+      <span class="sz-label" id="thumbSizeLabel">160</span>
+    </div>
+
+    <div class="toolbar-sep"></div>
+
+    <button class="tb-btn" id="btnViewGrid" onclick="switchView('grid')" title="Grid View">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <button class="tb-btn" id="btnViewFull" onclick="switchView('viewer')" title="Full View" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 9h6v6H9z"/></svg>
+    </button>
+  </div>
+
+  <!-- Main Area -->
+  <div class="main">
+    <!-- Left Tree Panel -->
+    <div class="tree-panel" id="treePanel">
+      <div class="panel-header">Folders</div>
+      <div class="tree-scroll" id="treeScroll">
+        <div style="padding:20px;text-align:center;color:var(--text-muted)">
+          <div class="spinner" style="margin:0 auto 10px;"></div>
+          <div style="font-size:11px;">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resizer -->
+    <div class="resizer" id="resizer"></div>
+
+    <!-- Content Panel -->
+    <div class="content-panel" id="contentPanel">
+
+      <!-- GRID VIEW -->
+      <div id="gridView" style="display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;">
+        <div class="thumb-grid" id="thumbGrid">
+          <!-- Welcome state -->
+          <div class="welcome-pane" id="welcomePane" style="grid-column:1/-1;">
+            <div class="big-icon">🗂️</div>
+            <h2>Select a folder</h2>
+            <p>Choose a folder from the tree on the left</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEWER VIEW -->
+      <div class="viewer-pane" id="viewerPane">
+        <div class="viewer-toolbar">
+          <button class="tb-btn" onclick="switchView('grid')" title="Back to grid">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </button>
+          <div class="toolbar-sep"></div>
+          <button class="tb-btn primary" onclick="rotateSelected('ccw')" title="Rotate Left (L)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Rotate Left
+          </button>
+          <div class="rotation-badge" id="viewerRotationBadge">0°</div>
+          <button class="tb-btn primary" onclick="rotateSelected('cw')" title="Rotate Right (R)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+            Rotate Right
+          </button>
+          <div class="toolbar-sep"></div>
+          <span class="vt-label" id="viewerFilename" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px;color:var(--text-dim);font-size:11.5px;letter-spacing:0;text-transform:none;"></span>
+          <span class="vt-label" id="viewerPosition" style="margin-left:auto;"></span>
+        </div>
+
+        <div class="viewer-stage">
+          <img id="mainImg" src="" alt="" class="loading">
+          <button class="img-nav-btn prev" onclick="navigateImage(-1)">‹</button>
+          <button class="img-nav-btn next" onclick="navigateImage(1)">›</button>
+        </div>
+
+        <div class="viewer-filmstrip" id="filmstrip"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="statusbar">
+    <div class="status-item">📁 <span id="statusFolder">No folder selected</span></div>
+    <div class="status-item">🖼 <span id="statusCount">0 images</span></div>
+    <div class="status-item" id="statusSelected" style="display:none;">✓ <span id="statusSelectedName"></span></div>
+    <div class="status-item" id="statusMulti" style="display:none;">⬛ <span id="statusMultiCount"></span> selected</div>
+    <div class="status-item" id="statusRotation" style="display:none;">↻ <span id="statusRotationVal"></span></div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxOpen()">🔍 Open / View</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxRotate('ccw')">↺ Rotate Left <span id="ctxCount" style="color:var(--text-muted);font-size:10px;margin-left:4px;"></span></div>
+  <div class="ctx-item" onclick="ctxRotate('cw')">↻ Rotate Right</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="selectAll();closeCtxMenu()">☑ Select All</div>
+  <div class="ctx-item" onclick="clearSelection();closeCtxMenu()">☐ Clear Selection</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" style="color:#e06c6c;" onclick="deleteSelected();closeCtxMenu()">🗑 Delete</div>
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+
+let treeData = [];
+let currentFolder = '';
+let currentImages = []; // [{name, path, rotation}]
+let selectedImagePath = null;
+let selectedPaths = new Set(); // multi-select set
+let lastClickedIdx = -1;       // for shift+click range
+let viewMode = 'grid'; // 'grid' | 'viewer'
+let folderHistory = [];
+let ctxTargetPath = null;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  // Show logged-in username
+  try {
+    const r = await fetch('/api/whoami');
+    if (r.ok) {
+      const d = await r.json();
+      const el = document.getElementById('loggedInAs');
+      if (el) el.textContent = d.username.toUpperCase();
+    }
+  } catch {}
+  await loadTree();
+  setupResizer();
+  setupKeyboard();
+  document.addEventListener('click', () => closeCtxMenu());
+}
+
+// ── TREE ──────────────────────────────────────────────────────────────────────
+
+async function loadTree() {
+  try {
+    const res = await fetch('/api/tree');
+    const data = await res.json();
+    treeData = data.children;
+    renderTree(data.children, document.getElementById('treeScroll'), 0);
+  } catch (e) {
+    document.getElementById('treeScroll').innerHTML = `<div style="padding:16px;color:var(--text-muted);font-size:11px;">Failed to load filesystem</div>`;
+  }
+}
+
+function renderTree(nodes, container, depth) {
+  container.innerHTML = '';
+  nodes.forEach(node => {
+    const el = createTreeNode(node, depth);
+    container.appendChild(el);
+  });
+}
+
+function createTreeNode(node, depth) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tree-node';
+
+  const row = document.createElement('div');
+  row.className = 'tree-row';
+  row.style.paddingLeft = (depth * 16 + 8) + 'px';
+
+  if (node.type === 'folder') {
+    const toggle = document.createElement('div');
+    toggle.className = 'tree-toggle';
+    toggle.textContent = '▶';
+
+    const icon = document.createElement('div');
+    icon.className = 'tree-icon';
+    icon.textContent = '📁';
+
+    const name = document.createElement('div');
+    name.className = 'tree-name';
+    name.textContent = node.name;
+
+    const count = document.createElement('div');
+    count.className = 'tree-count';
+    count.textContent = node.imageCount > 0 ? node.imageCount : '';
+
+    row.appendChild(toggle);
+    row.appendChild(icon);
+    row.appendChild(name);
+    row.appendChild(count);
+
+    const children = document.createElement('div');
+    children.className = 'tree-children';
+
+    // Toggle expand
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = children.classList.contains('open');
+      children.classList.toggle('open', !isOpen);
+      toggle.classList.toggle('open', !isOpen);
+      icon.textContent = !isOpen ? '📂' : '📁';
+
+      if (!isOpen && children.childElementCount === 0 && node.children) {
+        node.children.forEach(child => {
+          children.appendChild(createTreeNode(child, depth + 1));
+        });
+      }
+    });
+
+    row.addEventListener('click', (e) => {
+      selectFolder(node.path);
+      // Clear other selected rows
+      document.querySelectorAll('.tree-row.selected').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+    });
+
+    wrapper.appendChild(row);
+    wrapper.appendChild(children);
+
+  } else {
+    // File node in tree (usually not shown, but just in case)
+    const toggle = document.createElement('div');
+    toggle.className = 'tree-toggle leaf';
+    toggle.textContent = '▶';
+
+    const icon = document.createElement('div');
+    icon.className = 'tree-icon';
+    icon.textContent = '🖼';
+
+    const name = document.createElement('div');
+    name.className = 'tree-name';
+    name.textContent = node.name;
+
+    row.appendChild(toggle);
+    row.appendChild(icon);
+    row.appendChild(name);
+
+    row.addEventListener('click', () => openImage(node.path));
+    wrapper.appendChild(row);
+  }
+
+  return wrapper;
+}
+
+// ── FOLDER NAVIGATION ─────────────────────────────────────────────────────────
+
+async function selectFolder(folderPath) {
+  if (folderPath !== currentFolder) {
+    folderHistory.push(currentFolder);
+    document.getElementById('btnBack').disabled = folderHistory.length === 0;
+    document.getElementById('btnUp').disabled = !folderPath;
+  }
+
+  currentFolder = folderPath;
+  selectedImagePath = null;
+  updateBreadcrumb(folderPath);
+  updateStatusBar();
+  clearImageSelection();
+
+  try {
+    const res = await fetch('/api/folder?path=' + encodeURIComponent(folderPath));
+    const data = await res.json();
+    currentImages = data.images || [];
+    renderGrid(currentImages);
+    document.getElementById('statusFolder').textContent = folderPath ? folderPath.split('/').filter(Boolean).join(' › ') : 'Images Root';
+    document.getElementById('statusCount').textContent = `${currentImages.length} image${currentImages.length !== 1 ? 's' : ''}`;
+
+    // Fetch orientations in the background with concurrency limit of 6.
+    // Grid is already visible and scrollable — badges appear as data arrives.
+    fetchOrientationsInBackground(currentImages, folderPath);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Background orientation loader — runs after grid is rendered, never blocks UI.
+// Uses a concurrency pool so we don't fire 500 requests at once.
+async function fetchOrientationsInBackground(images, forFolder) {
+  const CONCURRENCY = 6;
+  const jpegImages = images.filter(img => {
+    const ext = img.path.split('.').pop().toLowerCase();
+    return ext === 'jpg' || ext === 'jpeg';
+  });
+
+  if (jpegImages.length === 0) return;
+
+  let idx = 0;
+
+  async function worker() {
+    while (true) {
+      // Stop if the user navigated to a different folder
+      if (currentFolder !== forFolder) return;
+
+      const img = jpegImages[idx++];
+      if (!img) return; // no more work
+
+      try {
+        const r = await fetch(`/api/orientation?path=${encodeURIComponent(img.path)}`);
+        if (!r.ok) continue;
+
+        // Stop if folder changed while we were waiting for the response
+        if (currentFolder !== forFolder) return;
+
+        const d = await r.json();
+        img.rotation = d.degrees;
+        img.orientationLoaded = true;
+
+        // Update the badge on the thumbnail card if it's still in the DOM
+        if (d.degrees !== 0) {
+          const card = document.querySelector(`.thumb-card[data-path="${CSS.escape(img.path)}"]`);
+          if (card) {
+            let badge = card.querySelector('.thumb-rotation-tag');
+            if (!badge) {
+              badge = document.createElement('div');
+              badge.className = 'thumb-rotation-tag';
+              card.querySelector('.thumb-img-wrap').appendChild(badge);
+            }
+            badge.textContent = d.degrees + '°';
+          }
+        }
+
+        // If this image is currently selected, update the toolbar too
+        if (img.path === selectedImagePath) {
+          document.getElementById('rotationBadge').textContent = d.degrees + '°';
+          document.getElementById('viewerRotationBadge').textContent = d.degrees + '°';
+          document.getElementById('statusRotation').style.display = d.degrees !== 0 ? 'flex' : 'none';
+          document.getElementById('statusRotationVal').textContent = d.degrees + '°';
+        }
+      } catch { /* network error — skip this image */ }
+    }
+  }
+
+  // Launch pool of concurrent workers
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+}
+
+function goBack() {
+  if (folderHistory.length > 0) {
+    const prev = folderHistory.pop();
+    currentFolder = '';
+    selectFolder(prev);
+    folderHistory.pop(); // remove duplicate pushed by selectFolder
+  }
+}
+
+function goUp() {
+  const parts = currentFolder.split('/').filter(Boolean);
+  parts.pop();
+  selectFolder(parts.join('/'));
+}
+
+function updateBreadcrumb(folderPath) {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = '';
+  const parts = folderPath ? folderPath.split('/').filter(Boolean) : [];
+
+  const root = document.createElement('span');
+  root.className = 'bc-part' + (parts.length === 0 ? ' active' : '');
+  root.textContent = '📁 Images';
+  root.onclick = () => selectFolder('');
+  bc.appendChild(root);
+
+  parts.forEach((part, i) => {
+    const sep = document.createElement('span');
+    sep.className = 'bc-sep';
+    sep.textContent = ' › ';
+    bc.appendChild(sep);
+
+    const span = document.createElement('span');
+    span.className = 'bc-part' + (i === parts.length - 1 ? ' active' : '');
+    span.textContent = part;
+    const pathUpTo = parts.slice(0, i + 1).join('/');
+    span.onclick = () => selectFolder(pathUpTo);
+    bc.appendChild(span);
+  });
+}
+
+// ── GRID ──────────────────────────────────────────────────────────────────────
+
+function renderGrid(images) {
+  const grid = document.getElementById('thumbGrid');
+  grid.innerHTML = '';
+
+  if (images.length === 0) {
+    grid.innerHTML = `
+      <div class="folder-empty" style="grid-column:1/-1;">
+        <div class="big-icon">📂</div>
+        <p>No images in this folder</p>
+      </div>`;
+    return;
+  }
+
+  images.forEach((img, idx) => {
+    const card = document.createElement('div');
+    card.className = 'thumb-card';
+    card.dataset.path = img.path;
+    card.dataset.idx = idx;
+
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'thumb-img-wrap';
+
+    const imgEl = document.createElement('img');
+    imgEl.className = 'loading';
+    imgEl.alt = img.name;
+    // Use IntersectionObserver for lazy loading
+    imgEl.dataset.src = `/api/thumb?path=${encodeURIComponent(img.path)}`;
+
+    if (img.rotation && img.rotation !== 0) {
+      const badge = document.createElement('div');
+      badge.className = 'thumb-rotation-tag';
+      badge.textContent = img.rotation + '°';
+      imgWrap.appendChild(badge);
+    }
+
+    const ph = document.createElement('div');
+    ph.className = 'thumb-placeholder';
+    ph.innerHTML = '<div style="font-size:24px;opacity:0.2;">🖼</div>';
+
+    imgEl.onload = () => { imgEl.classList.remove('loading'); ph.remove(); };
+    imgEl.onerror = () => { ph.innerHTML = '<div style="font-size:20px;opacity:0.2;">⚠</div>'; };
+
+    const checkEl = document.createElement('div');
+    checkEl.className = 'thumb-check';
+    checkEl.textContent = '✓';
+
+    imgWrap.appendChild(ph);
+    imgWrap.appendChild(imgEl);
+    imgWrap.appendChild(checkEl);
+
+    const label = document.createElement('div');
+    label.className = 'thumb-label';
+    label.textContent = img.name;
+    label.title = img.name;
+
+    card.appendChild(imgWrap);
+    card.appendChild(label);
+
+    card.addEventListener('click', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+click: toggle this image in multi-select
+        toggleSelectImage(img.path, idx);
+      } else if (e.shiftKey && lastClickedIdx !== -1) {
+        // Shift+click: range select from lastClickedIdx to idx
+        rangeSelectImages(lastClickedIdx, idx);
+      } else {
+        // Normal click: single select
+        selectImage(img.path, idx);
+      }
+    });
+
+    card.addEventListener('dblclick', () => {
+      selectImage(img.path, idx);
+      switchView('viewer');
+    });
+
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      // If right-clicked image is not in selection, select it first
+      if (!selectedPaths.has(img.path)) {
+        selectImage(img.path, idx);
+      }
+      ctxTargetPath = img.path;
+      showCtxMenu(e.clientX, e.clientY);
+    });
+
+    grid.appendChild(card);
+  });
+
+  // Apply current thumb size to newly rendered cards
+  const currentSize = parseInt(document.getElementById('thumbSizeSlider')?.value || 160);
+  if (currentSize !== 160) setThumbSize(currentSize);
+
+  // Lazy load with IntersectionObserver
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        if (img.dataset.src) {
+          img.src = img.dataset.src;
+          delete img.dataset.src;
+          observer.unobserve(img);
+        }
+      }
+    });
+  }, { root: grid, rootMargin: '100px' });
+
+  grid.querySelectorAll('img[data-src]').forEach(img => observer.observe(img));
+}
+
+// ── IMAGE SELECTION & VIEWER ───────────────────────────────────────────────────
+
+async function selectImage(imgPath, idx) {
+  const idx2 = idx !== undefined ? idx : currentImages.findIndex(i => i.path === imgPath);
+  lastClickedIdx = idx2;
+
+  // Single select — clear multi-select set and pick just this one
+  selectedPaths.clear();
+  selectedPaths.add(imgPath);
+  selectedImagePath = imgPath;
+
+  updateSelectionUI();
+
+  const imgData = currentImages[idx2];
+
+  // Fetch orientation lazily if not already loaded (rotation === 0 is ambiguous,
+  // but we track whether we've fetched it with a flag)
+  if (imgData && !imgData.orientationLoaded) {
+    try {
+      const r = await fetch(`/api/orientation?path=${encodeURIComponent(imgPath)}`);
+      if (r.ok) {
+        const d = await r.json();
+        imgData.rotation = d.degrees;
+        imgData.orientationLoaded = true;
+        // Update rotation badge on the thumbnail card
+        const card = document.querySelector(`.thumb-card[data-path="${CSS.escape(imgPath)}"]`);
+        if (card) {
+          let badge = card.querySelector('.thumb-rotation-tag');
+          if (imgData.rotation !== 0) {
+            if (!badge) {
+              badge = document.createElement('div');
+              badge.className = 'thumb-rotation-tag';
+              card.querySelector('.thumb-img-wrap').appendChild(badge);
+            }
+            badge.textContent = imgData.rotation + '°';
+          } else if (badge) {
+            badge.remove();
+          }
+        }
+      }
+    } catch {}
+    if (imgData) imgData.orientationLoaded = true;
+  }
+
+  const rotation = imgData ? imgData.rotation : 0;
+  document.getElementById('rotationBadge').textContent = rotation + '°';
+  document.getElementById('viewerRotationBadge').textContent = rotation + '°';
+  document.getElementById('statusSelected').style.display = 'flex';
+  document.getElementById('statusSelectedName').textContent = imgData ? imgData.name : '';
+  document.getElementById('statusRotation').style.display = rotation !== 0 ? 'flex' : 'none';
+  document.getElementById('statusRotationVal').textContent = rotation + '°';
+
+  // If in viewer mode, load image
+  if (viewMode === 'viewer') {
+    loadViewerImage(imgPath, idx2);
+  }
+}
+
+function toggleSelectImage(imgPath, idx) {
+  lastClickedIdx = idx;
+  if (selectedPaths.has(imgPath)) {
+    selectedPaths.delete(imgPath);
+    if (selectedImagePath === imgPath) {
+      // Pick another selected image as the "primary"
+      selectedImagePath = selectedPaths.size > 0 ? [...selectedPaths][0] : null;
+    }
+  } else {
+    selectedPaths.add(imgPath);
+    selectedImagePath = imgPath;
+  }
+  updateSelectionUI();
+}
+
+function rangeSelectImages(fromIdx, toIdx) {
+  const start = Math.min(fromIdx, toIdx);
+  const end   = Math.max(fromIdx, toIdx);
+  for (let i = start; i <= end; i++) {
+    if (currentImages[i]) selectedPaths.add(currentImages[i].path);
+  }
+  lastClickedIdx = toIdx;
+  selectedImagePath = currentImages[toIdx]?.path || selectedImagePath;
+  updateSelectionUI();
+}
+
+function selectAll() {
+  currentImages.forEach(img => selectedPaths.add(img.path));
+  selectedImagePath = currentImages[0]?.path || null;
+  lastClickedIdx = 0;
+  updateSelectionUI();
+}
+
+function clearSelection() {
+  selectedPaths.clear();
+  selectedImagePath = null;
+  lastClickedIdx = -1;
+  updateSelectionUI();
+  document.getElementById('statusSelected').style.display = 'none';
+  document.getElementById('statusRotation').style.display = 'none';
+  document.getElementById('rotationBadge').textContent = '0°';
+}
+
+function updateSelectionUI() {
+  const count = selectedPaths.size;
+
+  // Update card highlight states
+  document.querySelectorAll('.thumb-card').forEach(card => {
+    const isSelected = selectedPaths.has(card.dataset.path);
+    card.classList.toggle('selected', isSelected);
+  });
+
+  // Toolbar buttons
+  document.getElementById('btnRotateCCW').disabled = count === 0;
+  document.getElementById('btnRotateCW').disabled  = count === 0;
+  document.getElementById('btnViewFull').disabled  = count === 0;
+  document.getElementById('rotationBadge').style.display = count === 1 ? 'block' : 'none';
+  document.getElementById('btnClearSel').style.display = count > 0 ? '' : 'none';
+  document.getElementById('btnDelete').style.display = count > 0 ? '' : 'none';
+
+  // Status bar
+  if (count > 1) {
+    document.getElementById('statusMulti').style.display = 'flex';
+    document.getElementById('statusMultiCount').textContent = count;
+    document.getElementById('statusSelected').style.display = 'none';
+    document.getElementById('statusRotation').style.display = 'none';
+  } else {
+    document.getElementById('statusMulti').style.display = 'none';
+  }
+}
+
+function openImage(imgPath) {
+  const idx = currentImages.findIndex(i => i.path === imgPath);
+  selectImage(imgPath, idx);
+  switchView('viewer');
+}
+
+function clearImageSelection() {
+  selectedImagePath = null;
+  selectedPaths.clear();
+  lastClickedIdx = -1;
+  document.getElementById('btnRotateCCW').disabled = true;
+  document.getElementById('btnRotateCW').disabled = true;
+  document.getElementById('btnViewFull').disabled = true;
+  document.getElementById('rotationBadge').style.display = 'none';
+  document.getElementById('btnClearSel').style.display = 'none';
+  document.getElementById('btnDelete').style.display = 'none';
+  document.getElementById('statusSelected').style.display = 'none';
+  document.getElementById('statusRotation').style.display = 'none';
+  document.getElementById('statusMulti').style.display = 'none';
+  document.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('selected'));
+}
+
+// ── VIEW SWITCHING ────────────────────────────────────────────────────────────
+
+function switchView(mode) {
+  viewMode = mode;
+  const gridView = document.getElementById('gridView');
+  const viewerPane = document.getElementById('viewerPane');
+
+  if (mode === 'grid') {
+    gridView.style.display = 'flex';
+    viewerPane.classList.remove('active');
+  } else {
+    gridView.style.display = 'none';
+    viewerPane.classList.add('active');
+
+    if (selectedImagePath) {
+      const idx = currentImages.findIndex(i => i.path === selectedImagePath);
+      loadViewerImage(selectedImagePath, idx >= 0 ? idx : 0);
+    }
+  }
+}
+
+function loadViewerImage(imgPath, idx) {
+  const mainImg = document.getElementById('mainImg');
+  const imgData = currentImages[idx] || currentImages.find(i => i.path === imgPath);
+
+  mainImg.classList.add('loading');
+  mainImg.src = `/api/image?path=${encodeURIComponent(imgPath)}&t=${Date.now()}`;
+  mainImg.onload = () => mainImg.classList.remove('loading');
+
+  document.getElementById('viewerFilename').textContent = imgData ? imgData.name : '';
+  document.getElementById('viewerPosition').textContent = `${idx + 1} / ${currentImages.length}`;
+  document.getElementById('viewerRotationBadge').textContent = (imgData ? imgData.rotation : 0) + '°';
+
+  // Update filmstrip
+  renderFilmstrip(idx);
+
+  // Scroll filmstrip to current
+  const filmstrip = document.getElementById('filmstrip');
+  const activeThumb = filmstrip.querySelector('.film-thumb.active');
+  if (activeThumb) activeThumb.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+}
+
+function renderFilmstrip(activeIdx) {
+  const filmstrip = document.getElementById('filmstrip');
+  filmstrip.innerHTML = '';
+
+  currentImages.forEach((img, i) => {
+    const div = document.createElement('div');
+    div.className = 'film-thumb' + (i === activeIdx ? ' active' : '');
+
+    const imgEl = document.createElement('img');
+    imgEl.src = `/api/thumb?path=${encodeURIComponent(img.path)}&t=${Date.now()}`;
+    imgEl.alt = img.name;
+
+    div.appendChild(imgEl);
+    div.addEventListener('click', () => {
+      selectedImagePath = img.path;
+      loadViewerImage(img.path, i);
+    });
+
+    filmstrip.appendChild(div);
+  });
+}
+
+function navigateImage(dir) {
+  const idx = currentImages.findIndex(i => i.path === selectedImagePath);
+  if (idx === -1) return;
+  const newIdx = (idx + dir + currentImages.length) % currentImages.length;
+  selectedImagePath = currentImages[newIdx].path;
+  loadViewerImage(selectedImagePath, newIdx);
+
+  // Update grid selection too
+  document.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.thumb-card[data-path="${CSS.escape(selectedImagePath)}"]`);
+  if (card) card.classList.add('selected');
+}
+
+// ── ROTATION ──────────────────────────────────────────────────────────────────
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+async function rotateSelected(direction) {
+  // Collect all paths to rotate — use multi-select set if populated
+  const paths = selectedPaths.size > 0
+    ? [...selectedPaths]
+    : (selectedImagePath ? [selectedImagePath] : []);
+
+  if (paths.length === 0) return;
+
+  // Disable buttons during operation
+  document.getElementById('btnRotateCCW').disabled = true;
+  document.getElementById('btnRotateCW').disabled = true;
+
+  const total = paths.length;
+  const isBatch = total > 1;
+
+  const progress = document.getElementById('batchProgress');
+  const bar      = document.getElementById('batchBar');
+  const label    = document.getElementById('batchLabel');
+
+  if (isBatch) {
+    progress.classList.add('visible');
+    bar.style.width = '0%';
+    label.textContent = `Rotating 0 / ${total}`;
+  }
+
+  let done = 0;
+  let errors = 0;
+
+  for (const imgPath of paths) {
+    try {
+      const res = await fetch('/api/rotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: imgPath, direction })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        errors++;
+        console.error('Rotate failed for', imgPath, data.error);
+      } else {
+        const rotation = data.rotation ?? 0;
+
+        // Update in-memory state
+        const imgData = currentImages.find(i => i.path === imgPath);
+        if (imgData) imgData.rotation = rotation;
+
+        // Update thumbnail and badge
+        const card = document.querySelector(`.thumb-card[data-path="${CSS.escape(imgPath)}"]`);
+        if (card) {
+          const img = card.querySelector('img');
+          if (img) img.src = `/api/thumb?path=${encodeURIComponent(imgPath)}&t=${Date.now()}`;
+
+          let badge = card.querySelector('.thumb-rotation-tag');
+          if (rotation !== 0) {
+            if (!badge) {
+              badge = document.createElement('div');
+              badge.className = 'thumb-rotation-tag';
+              card.querySelector('.thumb-img-wrap').appendChild(badge);
+            }
+            badge.textContent = rotation + '°';
+          } else {
+            if (badge) badge.remove();
+          }
+        }
+
+        // Update rotation badge in toolbar if this is the single selected image
+        if (paths.length === 1) {
+          document.getElementById('rotationBadge').textContent = rotation + '°';
+          document.getElementById('viewerRotationBadge').textContent = rotation + '°';
+          document.getElementById('statusRotation').style.display = rotation !== 0 ? 'flex' : 'none';
+          document.getElementById('statusRotationVal').textContent = rotation + '°';
+        }
+
+        // If in viewer mode and this is the current image, reload it
+        if (viewMode === 'viewer' && imgPath === selectedImagePath) {
+          const idx = currentImages.findIndex(i => i.path === imgPath);
+          loadViewerImage(imgPath, idx);
+        }
+      }
+    } catch (e) {
+      errors++;
+      console.error('Rotate error for', imgPath, e);
+    }
+
+    done++;
+    if (isBatch) {
+      bar.style.width = Math.round((done / total) * 100) + '%';
+      label.textContent = `Rotating ${done} / ${total}`;
+    }
+  }
+
+  if (isBatch) {
+    setTimeout(() => {
+      progress.classList.remove('visible');
+      bar.style.width = '0%';
+    }, 800);
+  }
+
+  if (errors > 0) {
+    showToast(`⚠ ${errors} of ${total} image${total > 1 ? 's' : ''} failed to rotate`);
+  } else if (isBatch) {
+    showToast(`✓ ${total} images rotated`);
+  }
+
+  // Re-enable buttons
+  document.getElementById('btnRotateCCW').disabled = selectedPaths.size === 0;
+  document.getElementById('btnRotateCW').disabled  = selectedPaths.size === 0;
+}
+
+// ── CONTEXT MENU ──────────────────────────────────────────────────────────────
+
+function showCtxMenu(x, y) {
+  const menu = document.getElementById('ctxMenu');
+  menu.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 180) + 'px';
+  const count = selectedPaths.size;
+  const ctxCount = document.getElementById('ctxCount');
+  if (ctxCount) ctxCount.textContent = count > 1 ? `(${count})` : '';
+  menu.classList.add('open');
+}
+
+function closeCtxMenu() {
+  document.getElementById('ctxMenu').classList.remove('open');
+}
+
+function ctxOpen() {
+  if (ctxTargetPath) {
+    selectImage(ctxTargetPath);
+    switchView('viewer');
+  }
+  closeCtxMenu();
+}
+
+function ctxRotate(dir) {
+  // If right-clicked image is part of the selection, rotate all selected
+  // Otherwise just rotate the right-clicked image
+  if (!selectedPaths.has(ctxTargetPath)) {
+    selectedPaths.clear();
+    selectedPaths.add(ctxTargetPath);
+    selectedImagePath = ctxTargetPath;
+  }
+  rotateSelected(dir);
+  closeCtxMenu();
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────────
+
+function updateStatusBar() {
+  document.getElementById('statusSelected').style.display = 'none';
+  document.getElementById('statusRotation').style.display = 'none';
+}
+
+// ── DELETE ────────────────────────────────────────────────────────────────────
+
+let _pendingDeletePaths = [];
+
+function deleteSelected() {
+  const paths = [...selectedPaths];
+  if (paths.length === 0) return;
+  _pendingDeletePaths = paths;
+
+  const msg = document.getElementById('confirmMsg');
+  const okBtn = document.getElementById('confirmOkBtn');
+  if (paths.length === 1) {
+    const name = paths[0].split('/').pop();
+    msg.textContent = `Permanently delete "${name}"? This cannot be undone.`;
+    okBtn.textContent = 'Delete';
+  } else {
+    msg.textContent = `Permanently delete ${paths.length} selected images? This cannot be undone.`;
+    okBtn.textContent = `Delete ${paths.length} files`;
+  }
+  document.getElementById('confirmDialog').classList.add('open');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmDialog').classList.remove('open');
+  _pendingDeletePaths = [];
+}
+
+async function confirmDelete() {
+  const paths = [..._pendingDeletePaths];  // grab paths BEFORE closeConfirm clears them
+  closeConfirm();
+  if (paths.length === 0) return;
+
+  try {
+    const res = await fetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths })
+    });
+    const data = await res.json();
+
+    // Remove deleted images from currentImages and DOM
+    data.deleted.forEach(rel => {
+      currentImages = currentImages.filter(i => i.path !== rel);
+      selectedPaths.delete(rel);
+      const card = document.querySelector(`.thumb-card[data-path="${CSS.escape(rel)}"]`);
+      if (card) card.remove();
+    });
+
+    // Update count
+    document.getElementById('statusCount').textContent =
+      `${currentImages.length} image${currentImages.length !== 1 ? 's' : ''}`;
+
+    // Show empty state if folder now empty
+    if (currentImages.length === 0) {
+      document.getElementById('thumbGrid').innerHTML = `
+        <div class="folder-empty" style="grid-column:1/-1;">
+          <div class="big-icon">📂</div>
+          <p>No images in this folder</p>
+        </div>`;
+    }
+
+    // Clear selection state
+    selectedImagePath = null;
+    updateSelectionUI();
+    document.getElementById('statusSelected').style.display = 'none';
+    document.getElementById('statusRotation').style.display = 'none';
+
+    if (data.failed.length > 0) {
+      showToast(`⚠ ${data.failed.length} file${data.failed.length > 1 ? 's' : ''} could not be deleted`);
+    } else {
+      showToast(`🗑 ${data.deleted.length} file${data.deleted.length > 1 ? 's' : ''} deleted`);
+    }
+  } catch (e) {
+    showToast('⚠ Network error — delete failed');
+    console.error('Delete error:', e);
+  }
+}
+
+// ── THUMB SIZE ────────────────────────────────────────────────────────────────
+
+function setThumbSize(size) {
+  size = parseInt(size);
+  const labelHeight = 25; // px for filename label below thumb
+
+  // Update grid columns and row height
+  const grid = document.getElementById('thumbGrid');
+  grid.style.gridTemplateColumns = `repeat(auto-fill, ${size}px)`;
+  grid.style.gridAutoRows = `${size + labelHeight}px`;
+
+  // Update each card and image wrap
+  document.querySelectorAll('.thumb-card').forEach(card => {
+    card.style.width = size + 'px';
+  });
+  document.querySelectorAll('.thumb-img-wrap').forEach(wrap => {
+    wrap.style.width  = size + 'px';
+    wrap.style.height = size + 'px';
+  });
+
+  // Update the label
+  document.getElementById('thumbSizeLabel').textContent = size;
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────────
+
+function setupKeyboard() {
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === 'ArrowLeft') navigateImage(-1);
+    else if (e.key === 'ArrowRight') navigateImage(1);
+    else if (e.key === 'l' || e.key === 'L') { if (selectedPaths.size > 0) rotateSelected('ccw'); }
+    else if (e.key === 'r' || e.key === 'R') { if (selectedPaths.size > 0) rotateSelected('cw'); }
+    else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && viewMode === 'grid') { e.preventDefault(); selectAll(); }
+    else if (e.key === 'Escape' && document.getElementById('confirmDialog').classList.contains('open')) closeConfirm();
+    else if (e.key === 'Escape' && viewMode === 'viewer') switchView('grid');
+    else if (e.key === 'Escape' && viewMode === 'grid' && selectedPaths.size > 0) clearSelection();
+    else if (e.key === 'Delete' && viewMode === 'grid' && selectedPaths.size > 0) deleteSelected();
+    else if (e.key === 'Enter' && selectedImagePath && viewMode === 'grid') switchView('viewer');
+    else if (e.key === 'Backspace' && viewMode === 'viewer') switchView('grid');
+  });
+}
+
+// ── RESIZER ───────────────────────────────────────────────────────────────────
+
+function setupResizer() {
+  const resizer = document.getElementById('resizer');
+  const treePanel = document.getElementById('treePanel');
+  let dragging = false, startX = 0, startW = 0;
+
+  resizer.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.clientX;
+    startW = treePanel.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const newW = Math.max(160, Math.min(480, startW + (e.clientX - startX)));
+    treePanel.style.width = newW + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+}
+
+// ── START ──────────────────────────────────────────────────────────────────────
+
+init();
+</script>
+<div class="toast" id="toast"></div>
+
+<div class="confirm-dialog" id="confirmDialog">
+  <div class="confirm-box">
+    <h3>Delete images</h3>
+    <p id="confirmMsg">Are you sure you want to permanently delete these files? This cannot be undone.</p>
+    <div class="confirm-actions">
+      <button class="confirm-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="confirm-delete" id="confirmOkBtn" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="batch-progress" id="batchProgress"><span id="batchLabel">Rotating...</span><div class="batch-bar-wrap"><div class="batch-bar" id="batchBar"></div></div></div>
+
+</body>
+</html>

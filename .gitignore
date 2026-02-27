@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Local photo library (never commit actual images)
+images/
+
+# Thumbnail cache
+tmp/
+.pe-thumbcache/
+
+# Environment / secrets
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/

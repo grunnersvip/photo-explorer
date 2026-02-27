@@ -1,0 +1,16 @@
+{
+  "name": "photo-explorer",
+  "version": "1.0.0",
+  "description": "File-explorer style image gallery with persistent rotation",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sharp": "^0.33.2",
+    "exiftool-vendored": "^28.3.1",
+    "express-session": "^1.17.3",
+    "bcryptjs": "^2.4.3"
+  }
+}
