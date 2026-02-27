@@ -1,6 +1,6 @@
 services:
   photo-explorer:
-    image: xluciangit/photo-explorer:latest  # Replace with your Docker Hub username
+    image: xlucian1007/photo-explorer:latest  # Replace with your Docker Hub username
     container_name: photo-explorer
     user: "1000:1000"
     ports:
