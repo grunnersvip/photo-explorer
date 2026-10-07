@@ -319,7 +319,7 @@ app.get('/api/cache-stats', requireAuth, (req, res) => {
 
 // ── START ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, async () => {
+app.listen(PORT, 0.0.0.0, async () => {
   console.log(`Photo Explorer — http://localhost:${PORT}`);
   console.log(`[auth] Username: ${AUTH_USER}`);
   console.log(`[cache] Thumbnail cache: ${CACHE_DIR}`);
